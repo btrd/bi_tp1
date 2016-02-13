@@ -69,7 +69,7 @@ INNER JOIN temps ON temps.tid = ventes.tid
 GROUP BY temps.annee, produits.category, produits.pname, ventes.qte;
 
 /* 4 */
-SELECT temps.annee, produits.category, SUM(ventes.pu*ventes.qte) AS "ca"
+SELECT temps.annee, produits.category, SUM(ventes.pu*ventes.qte) AS "CA"
 FROM ventes
 INNER JOIN clients ON clients.cl_id = ventes.cid
 INNER JOIN produits ON produits.pid = ventes.pid
@@ -77,10 +77,37 @@ INNER JOIN temps ON temps.tid = ventes.tid
 GROUP BY temps.annee, ROLLUP(produits.category);
 
 /* 5 */
-SELECT
-temps.annee, temps.mois, SUM(ventes.pu*ventes.qte) AS "ca", RANK () OVER (ORDER BY ca DESC) "Rank"
+SELECT res.annee, res.mois, res."CA"
+FROM (
+    SELECT temps.annee, temps.mois, SUM(ventes.pu*ventes.qte) "CA", RANK () OVER(PARTITION BY temps.annee ORDER BY SUM(ventes.pu*ventes.qte) DESC) "RANG"
+    FROM ventes
+    INNER JOIN produits ON produits.pid = ventes.pid
+    INNER JOIN temps ON temps.tid = ventes.tid
+    WHERE produits.pid = 61
+    GROUP BY temps.annee, temps.mois) res
+WHERE res."RANG" = 1;
+
+/* 6 */
+SELECT temps.ANNEE, clients.CL_NAME, produits.CATEGORY, SUM(ventes.QTE*ventes.PU) "CA TOTAL"
 FROM ventes
-INNER JOIN produits ON produits.pid = ventes.pid
-INNER JOIN temps ON temps.tid = ventes.tid
-WHERE produits.pid = 61
-GROUP BY  ROLLUP(temps.annee, temps.mois);
+INNER JOIN produits ON produits.PID = ventes.PID
+INNER JOIN temps ON temps.TID = ventes.TID
+INNER JOIN clients ON clients.CL_ID = ventes.CID
+GROUP BY GROUPING SETS((clients.CL_NAME, temps.ANNEE),(temps.ANNEE,  produits.CATEGORY));
+
+/* 7 */
+SELECT produits.CATEGORY, SUM(ventes.QTE) "QTE VENDUE 2010", NTILE(3) OVER(ORDER BY SUM(ventes.QTE) DESC) "TIERS"
+FROM ventes
+INNER JOIN produits ON produits.PID = ventes.PID
+INNER JOIN temps ON temps.TID = ventes.TID
+WHERE temps.ANNEE = 2010
+GROUP BY produits.CATEGORY;
+
+
+/* 8 */
+SELECT produits.CATEGORY, temps.MOIS, SUM(ventes.QTE) "QTE 5 JOURS 2010"
+FROM ventes
+INNER JOIN produits ON produits.PID = ventes.PID
+INNER JOIN temps ON temps.TID = ventes.TID
+WHERE temps.ANNEE = 2010 AND temps.JOUR = 1 OR temps.JOUR = 2 OR temps.JOUR = 3 OR temps.JOUR = 4 OR temps.JOUR = 5
+GROUP BY ROLLUP(produits.CATEGORY, temps.MOIS);
